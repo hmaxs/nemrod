@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Nemrod by conjecto</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Nemrod</h1>
+      <h2 class="project-tagline"></h2>
+      <a href="https://github.com/conjecto/nemrod" class="btn">View on GitHub</a>
+      <a href="https://github.com/conjecto/nemrod/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/conjecto/nemrod/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1>
+<a id="nemrod" class="anchor" href="#nemrod" aria-hidden="true"><span class="octicon octicon-link"></span></a>Nemrod</h1>
+
+<h2>
+<a id="what-is-nemrod" class="anchor" href="#what-is-nemrod" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is Nemrod?</h2>
+
+<p>Nemrod is a framework providing an abstraction layer for handling (consuming and producing) RDF in a Symfony2 project,
+in the same way Symfony users are using Doctrine. The framework provides five main components:</p>
+
+<ul>
+<li>a resource manager (similar to Doctrine's resource manager)</li>
+<li>a SPARQL query builder allowing to interact directly with your sparql endpoint(s)</li>
+<li>a form extension allowing to build forms to create or update data</li>
+<li>a json-ld serializer allowing to produce framed json-ld representation of RDF</li>
+<li>Optionally, a set of services can be set up that populates and update an Elasticsearch server wrt triple store content.</li>
+</ul>
+
+<p>Nemrod mainly relies on</p>
+
+<ul>
+<li><a href="https://github.com/njh/easyrdf">EasyRdf</a></li>
+<li><a href="https://github.com/lanthaler/JsonLD">Json-ld</a></li>
+<li><a href="https://github.com/ruflin/Elastica">Elastica</a></li>
+<li><a href="https://github.com/schmittjoh/JMSSerializerBundle">jms/serializer-bundle</a></li>
+</ul>
+
+<h2>
+<a id="requirements" class="anchor" href="#requirements" aria-hidden="true"><span class="octicon octicon-link"></span></a>Requirements</h2>
+
+<ul>
+<li>Symfony &gt; 2.3, <a href="http://symfony.com/get-started">Begin a Symfony Project</a>
+</li>
+</ul>
+
+<h2>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>Nemrod can be installed using composer. You first need to set the minimum stability level to "dev" in your composer.json:</p>
+
+<pre><code>{
+    ...
+    "minimum-stability": "dev"
+    ...
+}
+</code></pre>
+
+<p>you can then install the framework using the command:</p>
+
+<pre><code>composer require conjecto/nemrod
+</code></pre>
+
+<p>you can also add dependency directly in your composer.json file:</p>
+
+<pre><code>"conjecto/nemrod": "~0.1.0@dev"
+</code></pre>
+
+<p>Then you need to add one (or two) bundle(s) to the AppKernel.php:</p>
+
+<pre><code>class AppKernel extends Kernel
+{
+    public function registerBundles()
+    {
+        $bundles = array(
+            ...
+            new Conjecto\Nemrod\Bundle\NemrodBundle\NemrodBundle(),
+            new Conjecto\Nemrod\Bundle\ElasticaBundle\ElasticaBundle(),
+            ...
+        );
+    }
+}
+</code></pre>
+
+<p>The first bundle is the main framework bundle, the second should be enabled only if you wish to use an ElasticSearch server.</p>
+
+<p>A little bit of configuration is necessary to let Nemrod know one thing or two about your environment:</p>
+
+<pre><code>nemrod:
+  endpoints:
+    my_endpoint: "http://www.foo.org/sparql"
+    another_endpoint: "http://www.bar.net/sparql"
+  default_endpoint: my_endpoint
+  namespaces:
+    rdfs: "http://www.w3.org/2000/01/rdf-schema#"
+    foaf: "http://xmlns.com/foaf/0.1/"
+    #add the namespaces you need
+    mycompany: "http://www.example.org/mycompany"
+</code></pre>
+
+<p>At this point, Nemrod knows enough to access to your data. Use the 'rm' service's <code>findAll()</code> (which is an alias for 'nemrod.resource_manager.my_endpoint'):</p>
+
+<pre><code>&lt;?php
+
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Template;
+
+class ProductsController extends Controller
+{
+    /**
+     * @Route("/all/", name="product.index")
+     * @Template("ProductsBundle:index.html.twig")
+     */
+    public function indexAction()
+    {
+        $products = $this-&gt;container-&gt;get('rm')-&gt;getRepository('mycompany:Product')-&gt;findAll();
+        ...
+        return array("products" =&gt; $products);
+    }
+}
+</code></pre>
+
+<p>Alternatively, you can refine the set of data you want to get using the <code>findBy()</code> method:</p>
+
+<pre><code>    /**
+     * @Route("/category/{category}", name="product.category")
+     * @Template("ProductsBundle:index.html.twig")
+     */
+    public function categoryAction($category)
+    {
+        $products = $this-&gt;container-&gt;get('rm')
+            -&gt;getRepository('mycompany:Product')
+            -&gt;findBy(array('mycompany:category' =&gt; $category));
+        ...
+        return array("products" =&gt; $products);
+    }
+</code></pre>
+
+<p>You can then display your data using twig:</p>
+
+<pre><code>&lt;ul&gt;
+    {% for product in products %}
+        &lt;li class="list-group-item"&gt;{{ product['rdfs:label'].value }}&lt;/li&gt;
+    {% endfor %}
+&lt;/ul&gt;
+</code></pre>
+
+<p>Another possibility is to ask for a specific resource using its uri:</p>
+
+<pre><code>    /**
+     * @Route("/view/{uri}", name="product.view")
+     * @Template("ProductsBundle:view.html.twig")
+     */
+    public function viewAction($uri)
+    {
+        $product = $this-&gt;container-&gt;get('rm')
+            -&gt;getRepository('mycompany:Product')
+            -&gt;find($uri);
+        ...
+        return array("product" =&gt; $product);
+    }
+</code></pre>
+
+<p>If you need to encapsulate specific logic over your data, you can overload the default resource abstraction class. Overloading class must be defined in a RdfResource directory of your bundle directory:</p>
+
+<pre><code>+-- ProductBundle
+|   +-- Controller
+|   +-- DependencyInjection
+|   +-- Resources
+|   +-- RdfResource
+|       +-- Product
+</code></pre>
+
+<p>and must extend <code>Conjecto\Nemrod\Resource</code> (which is the default abstraction class):</p>
+
+<pre><code>&lt;?php
+
+namespace MyCompany\ProductBundle\RdfResource;
+
+use Conjecto\Nemrod\Resource as BaseResource;
+use Conjecto\Nemrod\ResourceManager\Annotation\Resource;
+
+/**
+ * Class Product
+ * @Resource(types={"mycompany:Product"}, uriPattern = "mycompany:product:")
+ */
+class Product extends BaseResource
+{
+
+}
+</code></pre>
+
+<p>the <a href="https://github.com/Resource" class="user-mention">@Resource</a> annotation allows to map your class and RDF types, so you can get an instance of this class when asking for object with the given types:</p>
+
+<pre><code>$product = $this-&gt;container-&gt;get('rm')-&gt;getRepository('mycompany:Product')-&gt;find($uri);
+</code></pre>
+
+<p>will fill <code>$products</code> with an array of <code>MyCompany\ProductBundle\RdfResource\Product</code> objects.</p>
+
+<p>An URI pattern can also be provided with <code>uriPattern</code>. It will be used to set an URI for a new resource. For now, the specified pattern is just used as a prefix</p>
+
+<h2>
+<a id="documentation" class="anchor" href="#documentation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Documentation</h2>
+
+<ul>
+<li><a href="doc/querybuilder.md">Using the Query Builder</a></li>
+<li><a href="doc/forms.md">Creating forms</a></li>
+<li><a href="doc/serializer.md">Serializing resources to Json-ld</a></li>
+<li><a href="doc/elasticsearch.md">Using ElasticSearch to index your data</a></li>
+</ul>
+
+<h2>
+<a id="contributing" class="anchor" href="#contributing" aria-hidden="true"><span class="octicon octicon-link"></span></a>Contributing</h2>
+
+<ul>
+<li>Feel free to install and test the framework. We'd love to have some feedback about it.</li>
+<li>A lot of tests has to be written. We are currently putting effort on that point. Any help would be appreciated.</li>
+</ul>
+
+<h2>
+<a id="licensing" class="anchor" href="#licensing" aria-hidden="true"><span class="octicon octicon-link"></span></a>Licensing</h2>
+
+<p>The Nemrod framework is licensed under the <a href="LICENSE.md">BSD-3-Clause</a> license.</p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/conjecto/nemrod">Nemrod</a> is maintained by <a href="https://github.com/conjecto">conjecto</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
+
